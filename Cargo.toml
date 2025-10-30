@@ -1,0 +1,16 @@
+[package]
+name = "knums-tool-new"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+imt = { git = "https://github.com/LiliumOS/imt.git", features = ["tar"] }
+logos = "0.15.1"
+lilium-sys = { git = "https://github.com/LiliumOS/lilium-sys.git", default-features = false, features = [
+    "uuid-crate",
+] }
+unicode-xid = "0.2.6"
+uuid = { version = "1.18.1", features = ["v7"] }
+walkdir = "2.5.0"
+peg = "0.8.5"
+bincode = "2.0.1"

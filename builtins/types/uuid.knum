@@ -1,0 +1,9 @@
+
+use types::int;
+
+struct Uuid {
+    minor: u64,
+    major: u64,
+}
+
+const NIL: Uuid = U{00000000-0000-0000-0000-000000000000};

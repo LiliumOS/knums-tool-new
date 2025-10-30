@@ -1,0 +1,3 @@
+%def_handle_type
+
+struct Handle opaque;

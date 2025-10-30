@@ -1,0 +1,4 @@
+%def_sys_result2
+
+type SysResult = isize;
+
