@@ -97,7 +97,7 @@ fn real_main(prg_name: &str, mut args: impl Iterator<Item = String>) -> std::io:
         .unwrap_or_else(|| imt::bundle::Path(Vec::new()));
 
     if bundle {
-        let mut bundle_file = Bundle::create(prefix);
+        let mut bundle_file = Bundle::create();
         let output_file = output_file.ok_or_else(|| {
             std::io::Error::new(
                 ErrorKind::InvalidInput,
@@ -126,7 +126,7 @@ fn real_main(prg_name: &str, mut args: impl Iterator<Item = String>) -> std::io:
             let file = convert_file(&file, path)?;
             bundle_file.add_file(imt::bundle::Path(vpath), file);
         }
-        bundle_file.write_tar(std::fs::File::create(output_file)?)?;
+        bundle_file.write_tar(&prefix, std::fs::File::create(output_file)?)?;
     } else {
         let file = std::fs::File::open(&input_file)?;
         let file = std::io::read_to_string(file)?;
