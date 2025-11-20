@@ -212,11 +212,9 @@ pub fn convert_type(ty: ast::Type, ctx_generics: &Generics) -> Result<imt::Type,
             let kind = match ptr.pointer_kind {
                 ast::PointerKind::Const => imt::PointerKind::Const,
                 ast::PointerKind::Mut => imt::PointerKind::Mut,
-                ast::PointerKind::Handle => {
-                    imt::PointerKind::Special(Uuid::parse("aebb2f51-578f-562a-a9e8-d5afe8676cc2"))
-                }
+                ast::PointerKind::Handle => imt::PointerKind::Special(knums_tool_new::HANDLE),
                 ast::PointerKind::SharedHandle => {
-                    imt::PointerKind::Special(Uuid::parse("5bcea25f-b255-5384-8357-d05c39936843"))
+                    imt::PointerKind::Special(knums_tool_new::SHARED_HANDLE)
                 }
             };
 
