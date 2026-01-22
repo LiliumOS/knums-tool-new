@@ -1,4 +1,10 @@
-use std::{ffi::OsStr, io::ErrorKind, process::ExitCode};
+use std::{
+    collections::HashSet,
+    ffi::OsStr,
+    io::{ErrorKind, Write},
+    path::PathBuf,
+    process::ExitCode,
+};
 
 use bincode::error::EncodeError;
 use imt::{
@@ -36,9 +42,10 @@ fn main() -> ExitCode {
 
 fn real_main(prg_name: &str, mut args: impl Iterator<Item = String>) -> std::io::Result<()> {
     let mut input_file: Option<String> = None;
-    let mut output_file: Option<String> = None;
+    let mut output_file: Option<String>;
     let mut prefix: Option<String> = None;
     let mut bundle = false;
+    let mut make_depfile = false;
     while let Some(arg) = args.next() {
         match &*arg {
             "--help" => {
@@ -72,6 +79,9 @@ fn real_main(prg_name: &str, mut args: impl Iterator<Item = String>) -> std::io:
             "--bundle" => {
                 bundle = true;
             }
+            "--deps" => {
+                make_depfile = true;
+            }
             x if x.starts_with("--") => {
                 return Err(std::io::Error::new(
                     ErrorKind::InvalidInput,
@@ -96,9 +106,11 @@ fn real_main(prg_name: &str, mut args: impl Iterator<Item = String>) -> std::io:
         .map(imt::bundle::Path)
         .unwrap_or_else(|| imt::bundle::Path(Vec::new()));
 
+    let mut dep_files = Vec::new();
+
     if bundle {
         let mut bundle_file = Bundle::create();
-        let output_file = output_file.ok_or_else(|| {
+        let output_file = output_file.as_ref().ok_or_else(|| {
             std::io::Error::new(
                 ErrorKind::InvalidInput,
                 "--bundle requires there to be an output file",
@@ -111,6 +123,7 @@ fn real_main(prg_name: &str, mut args: impl Iterator<Item = String>) -> std::io:
             if path.extension() != Some(OsStr::new("knum")) {
                 continue;
             }
+            dep_files.push(path.to_path_buf());
             let file = std::fs::File::open(path)?;
             let base = path.strip_prefix(&input_file).unwrap();
 
@@ -128,11 +141,12 @@ fn real_main(prg_name: &str, mut args: impl Iterator<Item = String>) -> std::io:
         }
         bundle_file.write_tar(&prefix, std::fs::File::create(output_file)?)?;
     } else {
+        dep_files.push(PathBuf::from(&input_file));
         let file = std::fs::File::open(&input_file)?;
         let file = std::io::read_to_string(file)?;
 
         let file = convert_file(&file, &input_file)?;
-        match if let Some(output_file) = output_file {
+        match if let Some(output_file) = output_file.as_ref() {
             bincode::encode_into_std_write(
                 &file,
                 &mut std::fs::File::create(output_file)?,
@@ -145,6 +159,19 @@ fn real_main(prg_name: &str, mut args: impl Iterator<Item = String>) -> std::io:
             Err(EncodeError::Io { inner, .. }) => return Err(inner),
             Err(e) => return Err(std::io::Error::new(ErrorKind::InvalidData, e)),
         }
+    }
+
+    if make_depfile && let Some(output_file) = output_file.as_ref() {
+        let depfile = format!("{output_file}.d");
+
+        let mut file = std::fs::File::create(&depfile)?;
+
+        write!(file, "{output_file}:")?;
+
+        for dep in dep_files {
+            write!(file, " {}", dep.display())?;
+        }
+        writeln!(file)?;
     }
 
     Ok(())
