@@ -14,7 +14,7 @@ use ::imt::{
     value,
 };
 
-use crate::ast::{self, Generics, ItemBody, StructKind};
+use crate::ast::{self, GenericSuffix, Generics, ItemBody, StructKind};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum TyCheckError {
@@ -192,6 +192,21 @@ pub fn convert_type(ty: ast::Type, ctx_generics: &Generics) -> Result<imt::Type,
                 };
 
                 Ok(imt::Type::Param(idx as u32, suffix.map(Box::new)))
+            } else if n.base_name == "uninit" {
+                let Some(ast::GenericSuffix::Generics(mut n)) = n.suffix else {
+                    return Err(TyCheckError::WrongSuffixKind);
+                };
+
+                match &mut *n {
+                    [ty] => {
+                        let ty = core::mem::replace(ty, ast::Type::Void);
+
+                        let ty = convert_type(ty, ctx_generics)?;
+
+                        Ok(imt::Type::Uninit(Box::new(ty)))
+                    }
+                    _ => return Err(TyCheckError::WrongSuffixKind),
+                }
             } else {
                 let args = match n.suffix {
                     Some(ast::GenericSuffix::Generics(gn)) => Some(
@@ -270,8 +285,11 @@ pub fn convert_const_item(
     doc_attr: ItemDoc,
 ) -> Result<value::Value, TyCheckError> {
     let ty = convert_type(item.ty, &EMPTY_ARGS)?;
-    let val = match ty {
-        imt::Type::Int(intty) => convert_int(item.value, intty)?,
+    let val = match &ty {
+        imt::Type::Int(intty) => convert_int(item.value, *intty)?,
+        imt::Type::Named(name, None) if name == "SysResult" => {
+            convert_int(item.value, IntType::ilong)?
+        }
         _ => convert_non_int(item.value)?,
     };
 
@@ -323,6 +341,9 @@ pub fn convert_field(
     field: ast::Field,
     generics: &ast::Generics,
 ) -> Result<tydef::Field, TyCheckError> {
+    let doc_attr = ItemDoc {
+        doc_lines: field.doc.into_iter().map(|v| v.to_string()).collect(),
+    };
     let ty = convert_type(field.ty, generics)?;
 
     Ok(tydef::Field {

@@ -78,6 +78,7 @@ pub struct Fields<'src> {
 pub struct Field<'src> {
     pub name: &'src str,
     pub ty: Type<'src>,
+    pub doc: Vec<&'src str>,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

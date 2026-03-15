@@ -46,6 +46,7 @@ fn real_main(prg_name: &str, mut args: impl Iterator<Item = String>) -> std::io:
     let mut prefix: Option<String> = None;
     let mut bundle = false;
     let mut make_depfile = false;
+    let mut dry_run: bool = false;
     while let Some(arg) = args.next() {
         match &*arg {
             "--help" => {
@@ -75,6 +76,9 @@ fn real_main(prg_name: &str, mut args: impl Iterator<Item = String>) -> std::io:
                 prefix = Some(args.next().ok_or_else(|| {
                     std::io::Error::new(ErrorKind::InvalidInput, "--prefix requires an argument")
                 })?);
+            }
+            "--no-output" => {
+                dry_run = true;
             }
             "--bundle" => {
                 bundle = true;
@@ -139,25 +143,34 @@ fn real_main(prg_name: &str, mut args: impl Iterator<Item = String>) -> std::io:
             let file = convert_file(&file, path)?;
             bundle_file.add_file(imt::bundle::Path(vpath), file);
         }
-        bundle_file.write_tar(&prefix, std::fs::File::create(output_file)?)?;
+        if !dry_run {
+            bundle_file.write_tar(&prefix, std::fs::File::create(output_file)?)?;
+        }
     } else {
         dep_files.push(PathBuf::from(&input_file));
         let file = std::fs::File::open(&input_file)?;
         let file = std::io::read_to_string(file)?;
 
         let file = convert_file(&file, &input_file)?;
-        match if let Some(output_file) = output_file.as_ref() {
-            bincode::encode_into_std_write(
-                &file,
-                &mut std::fs::File::create(output_file)?,
-                format_config(),
-            )
-        } else {
-            bincode::encode_into_std_write(&file, &mut std::io::stdout().lock(), format_config())
-        } {
-            Ok(_) => {}
-            Err(EncodeError::Io { inner, .. }) => return Err(inner),
-            Err(e) => return Err(std::io::Error::new(ErrorKind::InvalidData, e)),
+
+        if !dry_run {
+            match if let Some(output_file) = output_file.as_ref() {
+                bincode::encode_into_std_write(
+                    &file,
+                    &mut std::fs::File::create(output_file)?,
+                    format_config(),
+                )
+            } else {
+                bincode::encode_into_std_write(
+                    &file,
+                    &mut std::io::stdout().lock(),
+                    format_config(),
+                )
+            } {
+                Ok(_) => {}
+                Err(EncodeError::Io { inner, .. }) => return Err(inner),
+                Err(e) => return Err(std::io::Error::new(ErrorKind::InvalidData, e)),
+            }
         }
     }
 
